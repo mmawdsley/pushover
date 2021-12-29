@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from argparse import ArgumentParser
+from dotenv import dotenv_values
+import http.client, urllib
+
+def main():
+    """Parse the notification and send it via pushover."""
+    title, message = get_notification()
+    send(title, message)
+
+def get_notification():
+    """Return the title and message of the notification."""
+    parser = ArgumentParser()
+    parser.add_argument('--error', action='store_true', help='Display error message')
+    parser.add_argument('--title', type=str, help='Notification title')
+    parser.add_argument('message', type=str, help='Notification message')
+    args = parser.parse_args()
+
+    message = args.message
+    title = 'General'
+
+    if args.title:
+        title = args.title
+
+    if args.error:
+        message = 'Error: %s' % message
+
+    return title, message
+
+def send(title, message):
+    """Send the notification."""
+    config = dotenv_values('.env')
+
+    conn = http.client.HTTPSConnection('api.pushover.net:443')
+    conn.request(
+        'POST',
+        '/1/messages.json',
+        urllib.parse.urlencode({
+            'token': config['PUSHOVER_APP_TOKEN'],
+            'user': config['PUSHOVER_USER_KEY'],
+            'title': title,
+            'message': message
+        }),
+        { 'Content-type': 'application/x-www-form-urlencoded' }
+    )
+    conn.getresponse()
+
+if __name__ == '__main__':
+    main()
