@@ -6,61 +6,84 @@ from dotenv import dotenv_values
 from os import path
 import http.client, urllib
 
-def main():
-    """Parse the notification and send it via pushover."""
-    notification = get_notification()
-    send(notification)
+class Pushover(object):
+    def __init__(self):
+        self.token = None
+        self.user = None
+        self.default_device = None
+        self.default_title = None
+        self.load_config()
 
-def get_notification():
-    """Return the notification to send."""
-    parser = ArgumentParser()
-    parser.add_argument('--error', action='store_true', help='Display error message')
-    parser.add_argument('--title', type=str, help='Notification title')
-    parser.add_argument('--devices', type=str, help='Device(s) to send to')
-    parser.add_argument('message', type=str, help='Notification message')
-    args = parser.parse_args()
+    def load_config(self):
+        """Load in the configuration from the .env file."""
+        env_path = path.join(path.dirname(path.realpath(__file__)), '.env')
+        config = dotenv_values(env_path)
 
-    notification = {
-        'title': 'General',
-        'message': args.message
-    }
+        self.token = config['PUSHOVER_APP_TOKEN']
+        self.user = config['PUSHOVER_USER_KEY']
 
-    if args.title:
-        notification['title'] = args.title
+        if 'DEFAULT_DEVICE' in config:
+            self.default_device = config['DEFAULT_DEVICE']
 
-    if args.error:
-        notification['message'] = 'Error: %s' % message
+        if 'DEFAULT_TITLE' in config:
+            self.default_title = config['DEFAULT_TITLE']
 
-    if args.devices:
-        notification['devices'] = args.devices
+    def main(self):
+        """Parse the notification and send it via pushover."""
+        notification = self.get_notification()
+        self.send(notification)
 
-    return notification
+    def get_notification(self):
+        """Return the notification to send."""
+        parser = ArgumentParser()
+        parser.add_argument('--error', action='store_true', help='Display error message')
+        parser.add_argument('--title', type=str, help='Notification title')
+        parser.add_argument('--devices', type=str, help='Device(s) to send to')
+        parser.add_argument('message', type=str, help='Notification message')
+        args = parser.parse_args()
 
-def send(notification):
-    """Send the notification."""
-    env_path = path.join(path.dirname(path.realpath(__file__)), '.env')
-    config = dotenv_values(env_path)
+        notification = {
+            'message': args.message
+        }
 
-    data = {
-        'token': config['PUSHOVER_APP_TOKEN'],
-        'user': config['PUSHOVER_USER_KEY'],
-        'title': notification['title'],
-        'message': notification['message']
-    }
+        if args.title:
+            notification['title'] = args.title
+        elif self.default_title:
+            notification['title'] = self.default_title
 
-    if 'devices' in notification:
-        data['device'] = notification['devices']
-    elif 'DEFAULT_DEVICE' in config:
-        data['device'] = config['DEFAULT_DEVICE']
+        if args.error:
+            notification['message'] = 'Error: %s' % message
 
-    conn = http.client.HTTPSConnection('api.pushover.net:443')
-    conn.request(
-        'POST',
-        '/1/messages.json',
-        urllib.parse.urlencode(data),
-        { 'Content-type': 'application/x-www-form-urlencoded' }
-    )
-    conn.getresponse()
+        if args.devices:
+            notification['devices'] = args.devices
+        elif self.default_device:
+            notification['devices'] = self.default_device
+
+        return notification
+
+    def send(self, notification):
+        """Send the notification."""
+
+        data = {
+            'token': self.token,
+            'user': self.user,
+            'message': notification['message']
+        }
+
+        if 'title' in notification:
+            data['title'] = notification['title']
+
+        if 'devices' in notification:
+            data['device'] = notification['devices']
+
+        conn = http.client.HTTPSConnection('api.pushover.net:443')
+        conn.request(
+            'POST',
+            '/1/messages.json',
+            urllib.parse.urlencode(data),
+            { 'Content-type': 'application/x-www-form-urlencoded' }
+        )
+        conn.getresponse()
 
 if __name__ == '__main__':
-    main()
+    Pushover().main()
