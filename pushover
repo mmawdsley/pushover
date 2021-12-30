@@ -7,42 +7,55 @@ import http.client, urllib
 
 def main():
     """Parse the notification and send it via pushover."""
-    title, message = get_notification()
-    send(title, message)
+    notification = get_notification()
+    send(notification)
 
 def get_notification():
-    """Return the title and message of the notification."""
+    """Return the notification to send."""
     parser = ArgumentParser()
     parser.add_argument('--error', action='store_true', help='Display error message')
     parser.add_argument('--title', type=str, help='Notification title')
+    parser.add_argument('--devices', type=str, help='Device(s) to send to')
     parser.add_argument('message', type=str, help='Notification message')
     args = parser.parse_args()
 
-    message = args.message
-    title = 'General'
+    notification = {
+        'title': 'General',
+        'message': args.message
+    }
 
     if args.title:
-        title = args.title
+        notification['title'] = args.title
 
     if args.error:
-        message = 'Error: %s' % message
+        notification['message'] = 'Error: %s' % message
 
-    return title, message
+    if args.devices:
+        notification['devices'] = args.devices
 
-def send(title, message):
+    return notification
+
+def send(notification):
     """Send the notification."""
     config = dotenv_values('.env')
+
+    data = {
+        'token': config['PUSHOVER_APP_TOKEN'],
+        'user': config['PUSHOVER_USER_KEY'],
+        'title': notification['title'],
+        'message': notification['message']
+    }
+
+    if 'devices' in notification:
+        data['device'] = notification['devices']
+    elif 'DEFAULT_DEVICE' in config:
+        data['device'] = config['DEFAULT_DEVICE']
 
     conn = http.client.HTTPSConnection('api.pushover.net:443')
     conn.request(
         'POST',
         '/1/messages.json',
-        urllib.parse.urlencode({
-            'token': config['PUSHOVER_APP_TOKEN'],
-            'user': config['PUSHOVER_USER_KEY'],
-            'title': title,
-            'message': message
-        }),
+        urllib.parse.urlencode(data),
         { 'Content-type': 'application/x-www-form-urlencoded' }
     )
     conn.getresponse()
