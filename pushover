@@ -52,7 +52,7 @@ class Pushover(object):
             notification['title'] = self.default_title
 
         if args.error:
-            notification['message'] = 'Error: %s' % message
+            notification['message'] = 'Error: %s' % args.message
 
         if args.devices:
             notification['devices'] = args.devices
